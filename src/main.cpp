@@ -4,7 +4,8 @@
 #include <Preferences.h>
 #include "DFRobotDFPlayerMini.h"
 
-#define wifi_SSID "CCongut"
+// #define wifi_SSID "CCongut"
+#define wifi_SSID "CLcongut"
 #define wifi_PSWD "88888888"
 
 #define sample_buffer_size 1000
@@ -12,7 +13,8 @@
 myI2S mems;
 int16_t *voicedata;
 
-IPAddress serverIP(192, 168, 31, 199);
+// IPAddress serverIP(192, 168, 31, 199);
+IPAddress serverIP(192, 168, 59, 172);
 uint16_t serverPort = 6060;
 WiFiClient client;
 static TaskHandle_t xTCPhandler = NULL;
@@ -26,6 +28,7 @@ Preferences prefs;
 
 DFRobotDFPlayerMini splayer;
 bool playov = false;
+volatile uint32_t Volume;
 
 void TCPTask(void *param)
 {
@@ -53,12 +56,31 @@ void TCPTask(void *param)
           String line = client.readStringUntil('\n');
           Serial.print("读取到数据：");
           Serial.println(line);
-          CompVal = line.toInt();
-          prefs.begin("CompareValue");
-          prefs.putUInt("CompVal", CompVal);
-          Serial.printf("设定比较值为: %d\r\n", CompVal);
-          prefs.end();
-          client.write(line.c_str());
+          if (line.startsWith("/"))
+          {
+            if (line.indexOf("set comval") > 0)
+            {
+              String value = line.substring(line.lastIndexOf(" ") + 1);
+              CompVal = value.toInt();
+              Serial.printf("设定比较值为: %d\r\n", CompVal);
+              client.printf("设定比较值为: %d\r\n", CompVal);
+              prefs.begin("CompareValue");
+              prefs.putUInt("CompVal", CompVal);
+              prefs.end();
+            }
+            else if (line.indexOf("set volume") > 0)
+            {
+              String value = line.substring(line.lastIndexOf(" ") + 1);
+              Volume = value.toInt();
+              splayer.volume(Volume);
+              Serial.printf("设定音量为: %d\r\n", Volume);
+              client.printf("设定音量为: %d\r\n", Volume);
+              prefs.begin("CompareValue");
+              prefs.putUInt("Volume", Volume);
+              prefs.end();
+            }
+          }
+          // client.write(line.c_str());
         }
       }
       Serial.println("关闭当前连接");
@@ -88,19 +110,21 @@ void setup()
   mems.SetSampleRate(10000);
   mems.SetChannelFormat(ONLY_LEFT);
   mems.SetDMABuffer(4, 64);
-  mems.SetInputMode(27, 32, 26);
+  mems.SetInputMode(33, 32, 35);
 
   pinMode(2, OUTPUT);
-
-  prefs.begin("CompareValue");
-  CompVal = prefs.getUInt("CompVal", 0);
-  Serial.printf("当前比较值为: %d\r\n", CompVal);
-  prefs.end();
 
   Serial2.begin(9600);
   splayer.begin(Serial2);
   splayer.outputDevice(DFPLAYER_DEVICE_SD);
-  splayer.volume(15);
+
+  prefs.begin("CompareValue");
+  CompVal = prefs.getUInt("CompVal", 0);
+  Serial.printf("当前比较值为: %d\r\n", CompVal);
+  Volume = prefs.getUInt("Volume", 0);
+  splayer.volume(Volume);
+  Serial.printf("当前音量为: %d\r\n", Volume);
+  prefs.end();
 
   pinMode(13, INPUT);
   attachInterrupt(digitalPinToInterrupt(13), bussz_isr, RISING);
@@ -108,14 +132,14 @@ void setup()
   // esp_sleep_enable_timer_wakeup(2e6);
   // esp_deep_sleep_start();
 
-  // xTaskCreatePinnedToCore(
-  //     TCPTask,
-  //     "TCPTask",
-  //     4096,
-  //     NULL,
-  //     5,
-  //     &xTCPhandler,
-  //     0);
+  xTaskCreatePinnedToCore(
+      TCPTask,
+      "TCPTask",
+      4096,
+      NULL,
+      5,
+      &xTCPhandler,
+      0);
 }
 
 void loop()
@@ -124,17 +148,18 @@ void loop()
 
   for (i = 0; i < sample_buffer_size; i++)
   {
-    // avg_ten += abs(voicedata[i]);
-    Serial.println(voicedata[i]);
+    avg_ten += abs(voicedata[i]);
   }
-  // avg_ten = avg_ten / 100;
+  avg_ten = avg_ten / 100;
 
-  // if (avg_ten > CompVal && !playov)
-  // {
-  //   digitalWrite(2, HIGH);
-  //   Serial.println("播放！");
-  //   splayer.play(1);
-  //   playov = true;
-  // }
-  // avg_ten = 0;
+  if (avg_ten > CompVal && !playov)
+  {
+    digitalWrite(2, HIGH);
+    Serial.println("播放！");
+    randomSeed(millis());
+    splayer.play(random(1, 130));
+    // splayer.play(1);
+    playov = true;
+  }
+  avg_ten = 0;
 }
