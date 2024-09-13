@@ -88,7 +88,7 @@ void setup()
   mems.SetSampleRate(10000);
   mems.SetChannelFormat(ONLY_LEFT);
   mems.SetDMABuffer(4, 64);
-  mems.SetInputMode(33, 32, 35);
+  mems.SetInputMode(27, 32, 26);
 
   pinMode(2, OUTPUT);
 
@@ -108,14 +108,14 @@ void setup()
   // esp_sleep_enable_timer_wakeup(2e6);
   // esp_deep_sleep_start();
 
-  xTaskCreatePinnedToCore(
-      TCPTask,
-      "TCPTask",
-      4096,
-      NULL,
-      5,
-      &xTCPhandler,
-      0);
+  // xTaskCreatePinnedToCore(
+  //     TCPTask,
+  //     "TCPTask",
+  //     4096,
+  //     NULL,
+  //     5,
+  //     &xTCPhandler,
+  //     0);
 }
 
 void loop()
@@ -124,16 +124,17 @@ void loop()
 
   for (i = 0; i < sample_buffer_size; i++)
   {
-    avg_ten += abs(voicedata[i]);
+    // avg_ten += abs(voicedata[i]);
+    Serial.println(voicedata[i]);
   }
-  avg_ten = avg_ten / 100;
+  // avg_ten = avg_ten / 100;
 
-  if (avg_ten > CompVal && !playov)
-  {
-    digitalWrite(2, HIGH);
-    Serial.println("播放！");
-    splayer.play(1);
-    playov = true;
-  }
-  avg_ten = 0;
+  // if (avg_ten > CompVal && !playov)
+  // {
+  //   digitalWrite(2, HIGH);
+  //   Serial.println("播放！");
+  //   splayer.play(1);
+  //   playov = true;
+  // }
+  // avg_ten = 0;
 }
